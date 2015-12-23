@@ -36,7 +36,6 @@
  * Next:
  *	Make the disp_ field in Deck persistent and allow the user to edit it
  *	First time opening Tango: Set up DB
- *	Allow non-keypad keys to be used for study as well!
  * Closing a window in front of Tango may cause it to quit as well?
  * Completing a card in repeats causes set size to decrease by 2
  * Add some actual content to the about screen
@@ -927,29 +926,37 @@ void MainFrame::keydown(wxKeyEvent &event) try
 	switch (key)
 	{
 		case WXK_NUMPAD_ENTER:
+		case '\r':
 			if (disp == Set::DispType::BACK || disp == Set::DispType::HINT) disp = Set::DispType::FRONT;
 			else disp = Set::DispType::BACK;
 			showcard();
 			return;
 		case WXK_NUMPAD1:
+		case '1':
 			ut = Card::UpdateType::DECR;
 			break;
 		case WXK_NUMPAD2:
+		case '2':
 			ut = Card::UpdateType::NORM;
 			break;
 		case WXK_NUMPAD3:
+		case '3':
 			ut = Card::UpdateType::INCR;
 			break;
 		case WXK_NUMPAD4:
+		case '4':
 			ut = Card::UpdateType::RESET;
 			break;
 		case WXK_NUMPAD5:
+		case '5':
 			ut = Card::UpdateType::SUSP;
 			break;
 		case WXK_NUMPAD6:
+		case '6':
 			ut = Card::UpdateType::DONE;
 			break;
 		case WXK_NUMPAD9:
+		case '9':
 			ut = Card::UpdateType::BURY;
 			break;
 		case 'H':
