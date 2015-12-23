@@ -82,7 +82,7 @@ public:
 	
 	void shift(int diff);
 	void edit(Deck &deck, int offset, int delay, Status status);
-	void field(std::string name, std::string value) { fields_.at(name) = value; backend::card_edit(*this); }
+	void field(std::string name, std::string value) { fields_.at(name) = value; backend::card_edit(*this, name); }
 	void update(UpdateType type);
 	friend bool operator ==(const Card &a, const Card &b) { return a.id_ == b.id_; }
 };

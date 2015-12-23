@@ -201,25 +201,24 @@ namespace backend
 		sqlite3_finalize(stmt);
 	}
 	
-	void card_edit(const Card &card)
+	void card_edit(const Card &card, const std::string &field)
 	{
+		std::string value = card.field(field); // The fact that this is necessary may indicate deeper issues with memory management
 		sqlite3_stmt *stmt;
 		if (db == nullptr) throw std::runtime_error{"Database connection unexpectedly closed"};
 		
-		checksql(sqlite3_prepare_v2(db, "delete from `field` where `card` = ?", -1, &stmt, nullptr));
+		checksql(sqlite3_prepare_v2(db, "delete from `field` where `card` = ? and `field` = ?", -1, &stmt, nullptr));
 		checksql(sqlite3_bind_int(stmt, 1, card.id()));
+		checksql(sqlite3_bind_text(stmt, 2, field.c_str(), -1, nullptr));
 		checksql(sqlite3_step(stmt));
 		sqlite3_finalize(stmt);
 		
-		for (const std::string &field : Card::fieldnames())
-		{
-			checksql(sqlite3_prepare_v2(db, "insert into `field` (`card`, `field`, `value`) values (?, ?, ?)", -1, &stmt, nullptr));
-			checksql(sqlite3_bind_int(stmt, 1, card.id()));
-			checksql(sqlite3_bind_text(stmt, 2, field.c_str(), -1, nullptr));
-			checksql(sqlite3_bind_text(stmt, 3, card.field(field).c_str(), -1, nullptr));
-			checksql(sqlite3_step(stmt));
-			sqlite3_finalize(stmt);
-		}
+		checksql(sqlite3_prepare_v2(db, "insert into `field` (`card`, `field`, `value`) values (?, ?, ?)", -1, &stmt, nullptr));
+		checksql(sqlite3_bind_int(stmt, 1, card.id()));
+		checksql(sqlite3_bind_text(stmt, 2, field.c_str(), -1, nullptr));
+		checksql(sqlite3_bind_text(stmt, 3, value.c_str(), -1, nullptr));
+		checksql(sqlite3_step(stmt));
+		sqlite3_finalize(stmt);
 	}
 	
 	void card_del(const Card &card)

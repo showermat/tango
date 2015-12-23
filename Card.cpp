@@ -113,7 +113,7 @@ Card &Card::add(Deck &deck, int id, std::unordered_map<std::string, std::string>
 	Card &c = cards_.back();
 	deck.addcard(c, ! fromdb);
 	if (! fromdb) backend::card_update(c);
-	if (! fromdb) backend::card_edit(c);
+	if (! fromdb) for (const std::string &field : Card::fieldnames()) backend::card_edit(c, field);
 	return c;
 }
 

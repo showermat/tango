@@ -37,7 +37,7 @@ namespace backend
 	void transac_begin();
 	void transac_end();
 	void card_update(const Card &card);
-	void card_edit(const Card &card);
+	void card_edit(const Card &card, const std::string &field);
 	void card_del(const Card &card);
 	void deck_edit(const Deck &deck, std::string oldname = "");
 	void deck_del(const Deck &deck);
