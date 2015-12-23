@@ -80,4 +80,12 @@ namespace util
 		for (i = str.length() - substr.length(); i > 0; i--) if (str.substr(i, substr.length()) == substr) break;
 		return str.substr(0, i);
 	}
+	
+	bool file_exists(const std::string &path)
+	{
+		struct stat buf;
+		if (stat(path.c_str(), &buf)) return false;
+		if (buf.st_mode & S_IFREG) return true;
+		return false;
+	}
 }

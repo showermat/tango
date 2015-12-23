@@ -30,6 +30,7 @@ namespace backend
 	extern sqlite3 *db;
 	
 	void init(const std::vector<std::string> &args);
+	void db_setup(const std::string &fname);
 	void early_populate();
 	void populate();
 	void commit();

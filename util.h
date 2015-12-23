@@ -13,6 +13,7 @@
 #include <exception>
 #include <stdexcept>
 #include <vector>
+#include <sys/stat.h>
 
 namespace util
 {
@@ -39,7 +40,8 @@ namespace util
 	int64_t utf8_codepoint(const std::string &str); // Return the codepoint of the UTF-8 character contained in the string
 	std::string basename(const std::string &str, const std::string &substr = "/"); // Return the part of the string after the last occurrence of the supplied substring
 	std::string dirname(const std::string &str, const std::string &substr = "/"); // Return the part of the string up to the last occurrence of the supplied substring
-
+	bool file_exists(const std::string &path); // Return true if the file exists and false otherwise
+	
 	struct enum_hash
 	{
 		template <typename T> inline typename std::enable_if<std::is_enum<T>::value, std::size_t>::type operator ()(T const value) const
