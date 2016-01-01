@@ -37,7 +37,6 @@
  *	Make the disp_ field in Deck persistent and allow the user to edit it
  * Closing a window in front of Tango may cause it to quit as well?
  * Completing a card in repeats causes set size to decrease by 2
- * Add some actual content to the about screen
  * Preferences screen
  *	Auto-advance decks every 24 hours
  *	Display settings for root deck, inherited by implicit decks
