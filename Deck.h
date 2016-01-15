@@ -17,7 +17,6 @@
 #include <random>
 #include <chrono>
 #include <cassert>
-#include "Card.h"
 #include "Bank.h"
 #include "Set.h"
 #include "coldesc.h"
@@ -26,11 +25,12 @@ class Deck
 {
 private:
 	static std::list<Deck> decks_;
-	static int decknum;
-	static std::default_random_engine rand;
+	static int decknum_;
+	static std::default_random_engine rand_;
 	static Deck &ensure(std::string name, bool expl);
 public:
 	static Deck root;
+	static int curstep; // Maybe this should be private
 	static bool exists(std::string deck) { return std::find_if(decks_.begin(), decks_.end(), [&deck](const Deck &d) { return d.canonical() == deck; }) != decks_.end(); }
 	static Deck &add(std::string name, bool fromdb = false);
 	static Deck &get(std::string name);
@@ -38,7 +38,8 @@ public:
 	static void del(Deck &deck);
 	static std::string freename();
 	static void rebuild_all() { for (Deck &d : decks_) d.build(); }
-	static void shift_all(int diff) { for (Deck &d : decks_) d.shift(diff); };
+	//static void shift_all(int diff) { for (Deck &d : decks_) d.shift(diff); };
+	static void step(int offset);
 	static void printtree(Deck *d = &root, std::string prefix = "") // For debug
 	{
 		std::cerr << prefix << d << " " << d->name_ << "\n";
@@ -82,23 +83,23 @@ public:
 	int size() const { return cards_.size(); }
 	const std::unordered_set<Card *> &cards() const { return cards_; }
 	bool explic() const { return explicit_; }
+	Deck *inherited() { for (Deck *d = this; d != nullptr; d = d->parent_) if (d->explicit_) return d; return &root; }
 	bool has(Card &card) const { return card.deck() == this; }
 	friend bool operator ==(const Deck &a, const Deck &b) { return a.id_ == b.id_; }
 	Set &set(Set::SetType type) { return sets_.at(type); }
-	Bank &bank() { if (explicit_) return bank_; return parent_->bank(); }
+	Bank &bank() { return bank_; }
 	std::unordered_map<Set::DispType, std::unordered_set<std::vector<Card::Field>, Set::vfhash>, Set::dthash> disp(Set::SetType type) { return disp().at(type); }
 	std::unordered_map<Set::SetType, Set> &sets() { return sets_; }
 	std::vector<std::string> vectorize(const std::vector<coldesc> &colspec);
 	int ncards() { int n = cards_.size(); for (Deck *d : children_) n += d->ncards(); return n; }
 
-	void shift(int diff);
-	void add_child(Deck *d, bool refresh = true) { children_.insert(d); if (refresh) s_refresh(); }
-	void del_child(Deck *d, bool refresh = true) { children_.erase(d); if (refresh) s_refresh(); }
+	//void shift(int diff);
+	void add_child(Deck *d, bool refresh = true) { children_.insert(d); if (refresh) build(); }
+	void del_child(Deck *d, bool refresh = true) { children_.erase(d); if (refresh) build(); }
 	bool edit(std::string name, bool explic);
 	void build();
-	void s_refresh() { for (std::pair<const Set::SetType, Set> &s : sets_) s.second.refresh(); }
 	void s_clear() { for (std::pair<const Set::SetType, Set> &s : sets_) s.second.clear(); }
-	void addcard(Card &c, bool refresh = true) { cards_.insert(&c); if (refresh) s_refresh(); }
+	void addcard(Card &c, bool refresh = true) { cards_.insert(&c); if (refresh) build(); }
 	void delcard(Card &c, bool refresh = true);
 };
 

@@ -34,59 +34,71 @@ std::vector<std::string> Bank::tokenize(std::string str)
 	return ret;
 }
 
+int Bank::BankItem::offset() const
+{
+	return step - Deck::curstep;
+}
+
+Bank &Bank::inherited() const
+{
+	return deck_->inherited()->bank();
+}
+
 Bank::Section &Bank::sect(std::string name)
 {
+	if (! deck_->explic()) return inherited().sect(name);
 	std::list<Section>::iterator s = std::find_if(basis_.begin(), basis_.end(), [&name](const Section &section) { return section.name == name; });
 	if (s != basis_.end()) return *s;
 	basis_.push_back(Section{name});
 	return basis_.back();
 }
 
-bool Bank::check(Card *card) // True if the card should go in kanji
+bool Bank::check(Card *card) // True if the card should go in kanji, preventing multiple cards with the same kanji from being placed in the same set
 {
-	if (! words_.size()) return false;
+	if (! words().size()) return false;
 	bool ret = false;
-	for (const std::string &word : tokenize(card->field(field_))) if (words_.count(word)) ret = true;
+	for (const std::string &word : tokenize(card->field(field_))) if (words().count(word)) ret = true;
 	if (! ret) return false;
-	for (const std::string &word : tokenize(card->field(field_))) if (! words_.count(word) || inset_.count(word) || words_.at(word).offset > 0) return false;
+	for (const std::string &word : tokenize(card->field(field_))) if (! words().count(word) || inset_.count(word) || words().at(word).offset() > 0) return false;
 	for (const std::string &word : tokenize(card->field(field_))) inset_.insert(word);
 	return true;
 }
 
-bool Bank::enable(std::string word, int offset, unsigned int n, bool fromdb)
+bool Bank::enable(std::string word, int step, unsigned int n, bool fromdb)
 {
-	if (words_.count(word)) return false;
-	words_.insert(std::make_pair(word, BankItem(offset, n)));
+	if (step == -1) step = Deck::curstep;
+	if (words().count(word)) return false;
+	words().insert(std::make_pair(word, BankItem(step, n)));
 	
-	if (! fromdb) backend::bank_edit(*deck_, word, 1, offset, n);
+	if (! fromdb) backend::bank_edit(*(inherited().deck_), word, 1, step, n);
 	return true;
 }
 
 bool Bank::disable(std::string word)
 {
-	if (! words_.count(word)) return false;
-	words_.erase(word);
-	backend::bank_edit(*deck_, word, 0, 0, 0);
+	if (! words().count(word)) return false;
+	words().erase(word);
+	backend::bank_edit(*(inherited().deck_), word, 0, 0, 0);
 	return true;
 }
 
 bool Bank::enabled(std::string word) const
 {
-	return words_.count(word) > 0;
+	return words().count(word) > 0;
 }
 
 void Bank::update(Card *card, Card::UpdateType type) // TODO offset
 {
 	if (! card->due(0)) for (const std::string &word : tokenize(card->field(field_)))
 	{
-		if (words_.count(word))
+		if (words().count(word))
 		{
-			BankItem &bi = words_.at(word);
-			bi.offset = 1;
+			BankItem &bi = words().at(word);
+			bi.step = Deck::curstep + 1;
 			bi.practices++;
 			// assert(inset_.count(word));
 			if (inset_.count(word)) inset_.erase(inset_.find(word));
-			backend::bank_edit(*deck_, word, 1, bi.offset, bi.practices);
+			backend::bank_edit(*(inherited().deck_), word, 1, bi.step, bi.practices);
 		}
 	}
 }
@@ -94,24 +106,24 @@ void Bank::update(Card *card, Card::UpdateType type) // TODO offset
 void Bank::commit(std::string olddeck) const
 {
 	backend::transac_begin();
-	for (const Section &s : basis_) for (const std::string &word : s.words)
+	for (const Section &s : inherited().basis_) for (const std::string &word : s.words)
 	{
-		if (words_.count(word))
+		if (words().count(word))
 		{
-			const BankItem &bi = words_.at(word);
-			backend::bank_edit(*deck_, word, 1, bi.offset, bi.practices, olddeck);
+			const BankItem &bi = words().at(word);
+			backend::bank_edit(*(inherited().deck_), word, 1, bi.step, bi.practices, olddeck);
 		}
-		else backend::bank_edit(*deck_, word, 0, 0, 0, olddeck);
+		else backend::bank_edit(*(inherited().deck_), word, 0, 0, 0, olddeck);
 	}
 	backend::transac_end();
 }
 
 void Bank::shift(int diff)
 {
-	for (std::pair<const std::string, BankItem> &word : words_)
+	for (std::pair<const std::string, BankItem> &word : words())
 	{
-		word.second.offset += diff;
-		backend::bank_edit(*deck_, word.first, 1, word.second.offset, word.second.practices);
+		word.second.step += diff;
+		backend::bank_edit(*(inherited().deck_), word.first, 1, word.second.step, word.second.practices);
 	}
 }
 
@@ -120,27 +132,27 @@ std::vector<std::string> Bank::vectorize(std::string word, const std::vector<col
 	std::vector<std::string> ret{};
 	for (coldesc col : colspec)
 	{
-		if (col.title == "Deck") ret.push_back(deck_->canonical());
+		if (col.title == "Deck") ret.push_back(inherited().deck_->canonical());
 		else if (col.title == "Word") ret.push_back(word);
-		else if (col.title == "Offset") ret.push_back(util::t2s(words_.at(word).offset));
-		else if (col.title == "Practices") ret.push_back(util::t2s<int>(words_.at(word).practices));
+		else if (col.title == "Offset") ret.push_back(util::t2s(words().at(word).offset()));
+		else if (col.title == "Practices") ret.push_back(util::t2s<int>(words().at(word).practices));
 		else ret.push_back("NULL");
 	}
 	return ret;
 }
 
-std::vector<std::string> Bank::words() const
+/*std::vector<std::string> Bank::wordlist() const
 {
 	std::vector<std::string> ret{};
-	for (const std::pair<std::string, BankItem> word : words_) ret.push_back(word.first);
+	for (const std::pair<std::string, BankItem> word : words()) ret.push_back(word.first);
 	return ret;
-}
+}*/
 
 std::string Bank::htmlview() const
 {
 	std::stringstream ret{};
 	ret << "<html><body>";
-	for (const Section &section : basis_)
+	for (const Section &section : inherited().basis_)
 	{
 		ret << "<h3>" << section.name << "</h3>";
 		for (const std::string &word : section.words) ret << "<bankbtn name=\"" << word << "\">"; // "<font color=" << (words_.count(word) ? "black" : "gray") << "><a href=\"" << word << "\">" << word << "</a></font>&nbsp;"

@@ -31,7 +31,7 @@ std::unordered_map<Set::SetType, std::unordered_map<Set::DispType, std::unordere
 	};
 }
 
-Set::Set(Deck *deck, SetType type) : items_{}, repeats_{}, type_{type}, top_{nullptr}, deck_{deck}, displays_{deck->disp(type)}, curdisp_{} { refresh(); }
+Set::Set(Deck *deck, SetType type) : items_{}, repeats_{}, type_{type}, top_{nullptr}, deck_{deck}, displays_{deck->disp(type)}, curdisp_{} { deck_->build(); shuffle(); }
 
 std::string Set::canonical() const
 {
@@ -77,13 +77,6 @@ std::string Set::disptop(DispType type)
 {
 	Card &c_top = top();
 	return c_top.display(curdisp_.at(type));
-}
-
-void Set::refresh()
-{
-	clear();
-	deck_->build();
-	shuffle();
 }
 
 void Set::shuffle()

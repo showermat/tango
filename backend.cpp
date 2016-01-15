@@ -89,8 +89,9 @@ namespace backend
 	void db_setup(const std::string &fname)
 	{
 		std::vector<std::string> schema{
-			"CREATE TABLE \"card\" ( `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, `deck` TEXT NOT NULL, `offset` INTEGER, `interval` INTEGER NOT NULL DEFAULT 0, `status` INTEGER )",
-			"CREATE TABLE \"character\" ( `deck` TEXT NOT NULL, `category` TEXT, `character` TEXT NOT NULL, `active` INTEGER NOT NULL, `offset` INTEGER, `count` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(deck,character), FOREIGN KEY(`deck`) REFERENCES deck ( id ), FOREIGN KEY(`category`) REFERENCES kanji_category ( name ) )",
+			"CREATE TABLE \"info\" (`version` INTEGER, `step` INTEGER)",
+			"CREATE TABLE \"card\" ( `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, `deck` TEXT NOT NULL, `step` INTEGER, `interval` INTEGER NOT NULL DEFAULT 0, `status` INTEGER )",
+			"CREATE TABLE \"character\" ( `deck` TEXT NOT NULL, `category` TEXT, `character` TEXT NOT NULL, `active` INTEGER NOT NULL, `step` INTEGER, `count` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(deck,character), FOREIGN KEY(`deck`) REFERENCES deck ( id ), FOREIGN KEY(`category`) REFERENCES kanji_category ( name ) )",
 			"CREATE TABLE \"character_category\" ( `deck` TEXT NOT NULL, `name` TEXT NOT NULL, PRIMARY KEY(deck,name) )",
 			"CREATE TABLE \"deck\" ( `name` TEXT NOT NULL, PRIMARY KEY(name) )",
 			"CREATE TABLE \"field\" ( `card` INTEGER NOT NULL, `field` TEXT NOT NULL, `value` TEXT, PRIMARY KEY(card,field), FOREIGN KEY(card) REFERENCES card(id), FOREIGN KEY(field) REFERENCES field(id) )",
@@ -139,12 +140,12 @@ namespace backend
 		while (sqlite3_step(stmt) == SQLITE_ROW) Deck::add(std::string{(const char *) sqlite3_column_text(stmt, 0)});
 		sqlite3_finalize(stmt);
 		
-		checksql(sqlite3_prepare_v2(db, "select `id`, `deck`, `offset`, `interval`, `status` from `card`", -1, &stmt, nullptr), "Failed to fetch cards");
+		checksql(sqlite3_prepare_v2(db, "select `id`, `deck`, `step`, `interval`, `status` from `card`", -1, &stmt, nullptr), "Failed to fetch cards");
 		while (sqlite3_step(stmt) == SQLITE_ROW)
 		{
 			int id{sqlite3_column_int(stmt, 0)};
 			std::string deckname{(const char *) sqlite3_column_text(stmt, 1)};
-			int offset{sqlite3_column_int(stmt, 2)};
+			int step{sqlite3_column_int(stmt, 2)};
 			int interval{sqlite3_column_int(stmt, 3)};
 			Card::Status status{(Card::Status) sqlite3_column_int(stmt, 4)};
 			std::unordered_map<std::string, std::string> fields{};
@@ -158,7 +159,7 @@ namespace backend
 				fields[field] = value;
 			}
 			sqlite3_finalize(stmt2);
-			Card::add(Deck::get(deckname), id, fields, offset, interval, status, 0, true);
+			Card::add(Deck::get(deckname), id, fields, step, interval, status, 0, true);
 		}
 		sqlite3_finalize(stmt);
 		
@@ -171,18 +172,18 @@ namespace backend
 		}
 		sqlite3_finalize(stmt);
 		
-		checksql(sqlite3_prepare_v2(db, "select `deck`, `category`, `character`, `active`, `offset`, `count` from `character`", -1, &stmt, nullptr), "Failed to fetch characters");
+		checksql(sqlite3_prepare_v2(db, "select `deck`, `category`, `character`, `active`, `step`, `count` from `character`", -1, &stmt, nullptr), "Failed to fetch characters");
 		while (sqlite3_step(stmt) == SQLITE_ROW)
 		{
 			std::string deckname{(const char *) sqlite3_column_text(stmt, 0)};
 			std::string category{(const char *) sqlite3_column_text(stmt, 1)};
 			std::string character{(const char *) sqlite3_column_text(stmt, 2)};
 			bool active{(bool) sqlite3_column_int(stmt, 3)};
-			int offset{sqlite3_column_int(stmt, 4)};
+			int step{sqlite3_column_int(stmt, 4)};
 			int count{sqlite3_column_int(stmt, 5)};
 			Bank &b = Deck::get(deckname).bank();
 			b.add(category, character);
-			if (active) b.enable(character, offset, count, true);
+			if (active) b.enable(character, step, count, true);
 		}
 		sqlite3_finalize(stmt);
 		//for (const Card &card : Card::cards()) for (std::string field : Card::fieldnames()) if (! card.hasfield(field)) throw std::runtime_error{"Card " + util::t2s(card.id()) + " missing field " + field};
@@ -194,12 +195,19 @@ namespace backend
 		sqlite3_stmt *stmt;
 		if (db == nullptr) throw std::runtime_error{"Database connection unexpectedly closed"};
 		
+		checksql(sqlite3_prepare_v2(db, "select `version`, `step` from `info`", -1, &stmt, nullptr), "Failed to verify database version");
+		if (sqlite3_step(stmt) != SQLITE_ROW) throw std::runtime_error{"Failed to verify database version"};
+		int ver = sqlite3_column_int(stmt, 0);
+		if (ver != db_version) throw std::runtime_error{"Program requires database of version " + util::t2s(db_version) + ", but current database is version " + util::t2s(ver)};
+		Deck::curstep = sqlite3_column_int(stmt, 1);
+		sqlite3_finalize(stmt);
+		
 		checksql(sqlite3_prepare_v2(db, "select `name` from `fieldname`", -1, &stmt, nullptr), "Failed to fetch field names");
 		while (sqlite3_step(stmt) == SQLITE_ROW)
 		{
 			std::string fieldname{(const char *) sqlite3_column_text(stmt, 0)};
 			Card::fieldnames_.push_back(fieldname);
-			Card::deffields[fieldname] = "";
+			Card::deffields_[fieldname] = "";
 		}
 		sqlite3_finalize(stmt);
 	}
@@ -231,12 +239,12 @@ namespace backend
 		if (sqlite3_step(stmt) != SQLITE_ROW) newcard = true;
 		sqlite3_finalize(stmt);
 		
-		if (newcard) checksql(sqlite3_prepare_v2(db, "insert into `card` (`deck`, `offset`, `interval`, `status`, `id`) values (?, ?, ?, ?, ?)", -1, &stmt, nullptr));
-		else checksql(sqlite3_prepare_v2(db, "update `card` set `deck` = ?, `offset` = ?, `interval` = ?, `status` = ? where `id` = ?", -1, &stmt, nullptr));
+		if (newcard) checksql(sqlite3_prepare_v2(db, "insert into `card` (`deck`, `step`, `interval`, `status`, `id`) values (?, ?, ?, ?, ?)", -1, &stmt, nullptr));
+		else checksql(sqlite3_prepare_v2(db, "update `card` set `deck` = ?, `step` = ?, `interval` = ?, `status` = ? where `id` = ?", -1, &stmt, nullptr));
 		
 		std::string name = card.deck()->canonical();
 		checksql(sqlite3_bind_text(stmt, 1, name.c_str(), -1, nullptr));
-		checksql(sqlite3_bind_int(stmt, 2, card.offset()));
+		checksql(sqlite3_bind_int(stmt, 2, card.step()));
 		checksql(sqlite3_bind_int(stmt, 3, card.delay()));
 		checksql(sqlite3_bind_int(stmt, 4, (int) card.status()));
 		checksql(sqlite3_bind_int(stmt, 5, card.id()));
@@ -315,9 +323,9 @@ namespace backend
 		sqlite3_finalize(stmt);
 	}
 	
-	void bank_edit(const Deck &deck, const std::string &character, bool active, int offset, int count, std::string olddeck)
+	void bank_edit(const Deck &deck, const std::string &character, bool active, int step, int count, std::string olddeck)
 	{
-		//std::cout << "Update " << character << " in deck " << deck.canonical() << " from deck " << olddeck << " to active = " << active << ", offset = " << offset << ", count = " << count << "\n";
+		//std::cout << "Update " << character << " in deck " << deck.canonical() << " from deck " << olddeck << " to active = " << active << ", step = " << step << ", count = " << count << "\n";
 		sqlite3_stmt *stmt;
 		if (db == nullptr) throw std::runtime_error{"Database connection unexpectedly closed"};
 		
@@ -341,13 +349,24 @@ namespace backend
 		int i = 1;
 		if (active)
 		{
-			checksql(sqlite3_prepare_v2(db, "update `character` set `active` = '1', `offset` = ?, `count` = ? where `deck` = ? and `character` = ?", -1, &stmt, nullptr));
-			checksql(sqlite3_bind_int(stmt, i++, offset));
+			checksql(sqlite3_prepare_v2(db, "update `character` set `active` = '1', `step` = ?, `count` = ? where `deck` = ? and `character` = ?", -1, &stmt, nullptr));
+			checksql(sqlite3_bind_int(stmt, i++, step));
 			checksql(sqlite3_bind_int(stmt, i++, count));
 		}
 		else checksql(sqlite3_prepare_v2(db, "update `character` set `active` = '0' where `deck` = ? and `character` = ?", -1, &stmt, nullptr));
 		checksql(sqlite3_bind_text(stmt, i++, deck.canonical().c_str(), -1, nullptr));
 		checksql(sqlite3_bind_text(stmt, i++, character.c_str(), -1, nullptr));
+		checksql(sqlite3_step(stmt));
+		sqlite3_finalize(stmt);
+	}
+	
+	void set_step(int step)
+	{
+		sqlite3_stmt *stmt;
+		if (db == nullptr) throw std::runtime_error{"Database connection unexpectedly closed"};
+		
+		checksql(sqlite3_prepare_v2(db, "update `info` set `step` = ?", -1, &stmt, nullptr));
+		checksql(sqlite3_bind_int(stmt, 1, step));
 		checksql(sqlite3_step(stmt));
 		sqlite3_finalize(stmt);
 	}

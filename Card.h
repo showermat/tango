@@ -29,12 +29,12 @@ private:
 	friend void backend::early_populate(); // TODO Replace with getters and setters
 	friend void backend::populate(); // TODO Same
 	static std::vector<std::string> fieldnames_;
-	static std::unordered_map<std::string, std::string> deffields;
-	static std::unordered_map<std::string, std::string> fieldpref, fieldsuff;	
+	static std::unordered_map<std::string, std::string> deffields_;
+	static std::unordered_map<std::string, std::string> fieldpref_, fieldsuff_;	
 	static std::list<Card> cards_;
-	static const double ratio;
+	static const double ratio_;
 	static const int maxdelay_;
-	static int cardnum;
+	static int cardnum_;
 public:
 	enum class Status { OK = 1, SUSP = 2, DONE = 3, LEECH = 4 };
 	enum class UpdateType { NONE, INCR, DECR, NORM, RESET, SUSP, LEECH, BURY, RESUME, DONE };
@@ -48,22 +48,22 @@ public:
 	static Field str2sit(std::string str);
 	static std::string html_furigana(std::string kanji, std::string furigana);
 	static std::string hiragana(std::string kanji, std::string furigana);
-	static Card &add(Deck &deck, int id = ++cardnum, std::unordered_map<std::string, std::string> fieldlist = deffields, int offset = 0, int delay = 1, Status status = Status::OK, int statinfo = 0, bool fromdb = false);
+	static Card &add(Deck &deck, int id = ++cardnum_, std::unordered_map<std::string, std::string> fieldlist = deffields_, int offset = 0, int delay = 1, Status status = Status::OK, int statinfo = 0, bool fromdb = false);
 	static Card &create(Deck &deck);
 	static std::list<Card> &cards() { return cards_; }
 	static void del(Card &card, bool refresh = true, bool explic = false);
 private:
 	int id_;
 	Deck *deck_;
-	int offset_;
+	int step_;
 	int delay_;
 	Status status_;
 	std::unordered_map<std::string, std::string> fields_;
-	Card(int id, Deck *deck, std::unordered_map<std::string, std::string> fieldlist, int offset, int delay, Status status, int statinfo);
+	Card(int id, Deck *deck, std::unordered_map<std::string, std::string> fieldlist, int step, int delay, Status status, int statinfo);
 public:
 	Card() = delete;
 	Card(const Card &orig) = delete;
-	Card(const Card&& orig) : id_{orig.id_}, deck_{orig.deck_}, offset_{orig.offset_}, delay_{orig.delay_}, status_{orig.status_}, fields_{std::move(orig.fields_)} { }
+	Card(const Card&& orig) : id_{orig.id_}, deck_{orig.deck_}, step_{orig.step_}, delay_{orig.delay_}, status_{orig.status_}, fields_{std::move(orig.fields_)} { }
 	Card operator =(const Card& orig) = delete;
 	virtual ~Card() { }
 	
@@ -74,7 +74,8 @@ public:
 	std::vector<std::string> vectorize(const std::vector<coldesc> &colspec) const;
 	std::string display(std::vector<Field> fields) const;
 	bool hasfield(std::string name) const { return fields_.count(name); }
-	int offset() const { return offset_; }
+	int offset() const;
+	int step() const { return step_; }
 	Status status() const { return status_; }
 	bool match(std::string query) const;
 	bool avail() const;

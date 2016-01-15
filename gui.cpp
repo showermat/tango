@@ -75,9 +75,9 @@ class MainFrame;
 
 class App: public wxApp
 {
-	virtual bool OnInit();
-	virtual int OnExit();
-	virtual bool OnExceptionInMainLoop();
+	virtual bool OnInit() override;
+	virtual int OnExit() override;
+	virtual bool OnExceptionInMainLoop() override;
 	MainFrame *frame;
 };
 
@@ -755,14 +755,14 @@ catch(std::exception &e) { except(e); }
 
 void MainFrame::offset_advanced(wxCommandEvent &event) try
 {
-	Deck::shift_all(-1);
+	Deck::step(1);
 	refresh_views();
 }
 catch(std::exception &e) { except(e); }
 
 void MainFrame::offset_reversed(wxCommandEvent &event) try
 {
-	Deck::shift_all(1);
+	Deck::step(-1);
 	refresh_views();
 }
 catch(std::exception &e) { except(e); }

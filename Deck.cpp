@@ -8,9 +8,17 @@
 #include "Deck.h"
 
 std::list<Deck> Deck::decks_{};
+int Deck::curstep = 0;
 Deck Deck::root{-1, "", true, nullptr}; // TODO Use the SetItemTypes here to set default set types.  Make a static function: set_default(sit, sit)...
-int Deck::decknum = 1;
-std::default_random_engine Deck::rand{(long unsigned int) std::chrono::system_clock::now().time_since_epoch().count()};
+int Deck::decknum_ = 1;
+std::default_random_engine Deck::rand_{(long unsigned int) std::chrono::system_clock::now().time_since_epoch().count()};
+
+void Deck::step(int offset)
+{
+	curstep += offset;
+	backend::set_step(curstep);
+	for (Deck &d : decks_) d.build();
+}
 
 Deck::Deck(int id, std::string name, bool explic, Deck *parent) : name_{name}, id_{id}, explicit_{explic}, cards_{}, parent_{parent}, children_{}, disp_{Set::defdisp() /* TODO */}, sets_{}, bank_{this, "Expression" /* TODO */}, curset_{nullptr}, valid_{true}
 {
@@ -34,7 +42,7 @@ Deck &Deck::ensure(std::string name, bool expl)
 		ensure(parentname, false);
 		if (parentname == "") parent = &root;
 		else parent = &*std::find_if(decks_.begin(), decks_.end(), [parentname](const Deck &d) { return d.canonical() == parentname; });
-		decks_.emplace_back(Deck{decknum++, util::basename(name), expl, parent});
+		decks_.emplace_back(Deck{decknum_++, util::basename(name), expl, parent});
 		parent->add_child(&decks_.back());
 		return decks_.back();
 	}		
@@ -100,8 +108,12 @@ void Deck::commit(std::string oldname) const
 
 void Deck::build()
 {
-	for (std::pair<const Set::SetType, Set> &s : sets_) s.second.empty();
-	bank_.clear();
+	for (std::pair<const Set::SetType, Set> &s : sets_)
+	{
+		s.second.clear();
+		s.second.empty();
+	}
+	bank().clear();
 	for (Card *c : cards_)
 	{
 		if (c->due(0))
@@ -112,6 +124,7 @@ void Deck::build()
 		}
 		if (c->avail()) sets_.at(Set::SetType::ALL).add(c);
 	}
+	for (std::pair<const Set::SetType, Set> &s : sets_) s.second.shuffle();
 }
 
 bool Deck::edit(std::string name, bool explic) // This still probably doesn't work quite right if you change whether the deck is explicit
@@ -139,7 +152,7 @@ bool Deck::edit(std::string name, bool explic) // This still probably doesn't wo
 	else if (explicit_ && ! explic) backend::deck_del(*this);
 	else if (! explicit_ && explic) disp_ = disp();
 	explicit_ = explic;
-	s_refresh();
+	build();
 	return true;
 }
 
@@ -166,10 +179,10 @@ void Deck::delcard(Card &c, bool refresh)
 		del(*this);
 		return;
 	}
-	if (refresh) s_refresh();
+	if (refresh) build();
 }
 
-void Deck::shift(int diff)
+/*void Deck::shift(int diff)
 {
 	backend::transac_begin();
 	for (Card *c : cards_) c->shift(diff);
@@ -178,7 +191,7 @@ void Deck::shift(int diff)
 	bank_.shift(diff);
 	backend::transac_end();
 	build();
-}
+}*/
 
 void Deck::remove()
 {

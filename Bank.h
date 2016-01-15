@@ -21,9 +21,10 @@ class Bank
 private:
 	struct BankItem
 	{
-		int offset;
+		int step;
 		unsigned int practices;
-		BankItem(int off, unsigned int p) : offset{off}, practices{p} { }
+		BankItem(int s, unsigned int p) : step{s}, practices{p} { }
+		int offset() const;
 	};
 	struct Section
 	{
@@ -41,6 +42,8 @@ private:
 	Deck *deck_;
 	std::list<Section> basis_;
 	Section &sect(std::string name);
+	Bank &inherited() const;
+	std::unordered_map<std::string, BankItem> &words() const { return inherited().words_; }
 public:
 	void addsect(std::string name) { sect(name); }
 	void add(std::string section, std::string word) { sect(section).add(word); }
@@ -51,18 +54,18 @@ public:
 	Bank &operator =(const Bank& orig) = default;
 	virtual ~Bank() { }
 	
-	int size() const { return words_.size(); }
+	int size() const { return words().size(); }
 	Deck *deck() const { return deck_; }
 	bool enabled(std::string word) const;
 	std::vector<std::string> vectorize(std::string word, const std::vector<coldesc> &colspec) const;
-	std::vector<std::string> words() const;
+	//std::vector<std::string> wordlist() const;
 	std::string htmlview() const;
 	void commit(std::string olddeck = "") const;
 	bool check(Card *card);
 	
 	void deck(Deck *d) { deck_ = d; }
 	void field(std::string f) { field_ = f; }
-	bool enable(std::string word, int offset = 0, unsigned int n = 0, bool fromdb = false);
+	bool enable(std::string word, int step = -1, unsigned int n = 0, bool fromdb = false);
 	bool disable(std::string word);
 	void shift(int diff);
 	void clear() { inset_.clear(); }

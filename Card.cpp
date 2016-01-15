@@ -10,11 +10,11 @@
 #include <iostream>
 
 std::vector<std::string> Card::fieldnames_{};
-std::unordered_map<std::string, std::string> Card::deffields{};
-const double Card::ratio = 2;
+std::unordered_map<std::string, std::string> Card::deffields_{};
+const double Card::ratio_ = 2;
 const int Card::maxdelay_ = 365;
 std::list<Card> Card::cards_{};
-int Card::cardnum = 1;
+int Card::cardnum_ = 1;
 
 std::string Card::stat2str(Status status)
 {
@@ -108,8 +108,11 @@ std::string Card::hiragana(std::string kanji, std::string furigana)
 
 Card &Card::add(Deck &deck, int id, std::unordered_map<std::string, std::string> fieldlist, int offset, int delay, Card::Status status, int statinfo, bool fromdb)
 {
-	cards_.emplace_back(Card{id, &deck, fieldlist, offset, delay, status, statinfo});
-	cardnum = std::max(id, cardnum);
+	int step;
+	if (fromdb) step = offset;
+	else step = offset + Deck::curstep;
+	cards_.emplace_back(Card{id, &deck, fieldlist, step, delay, status, statinfo});
+	cardnum_ = std::max(id, cardnum_);
 	Card &c = cards_.back();
 	deck.addcard(c, ! fromdb);
 	if (! fromdb) backend::card_update(c);
@@ -119,7 +122,7 @@ Card &Card::add(Deck &deck, int id, std::unordered_map<std::string, std::string>
 
 Card &Card::create(Deck &deck)
 {
-	return add(deck, ++cardnum, std::unordered_map<std::string, std::string>{}, 0, 0, Card::Status::OK, 0);
+	return add(deck, ++cardnum_, std::unordered_map<std::string, std::string>{}, 0, 0, Card::Status::OK, 0);
 }
 
 void Card::del(Card &card, bool refresh, bool explic)
@@ -136,7 +139,7 @@ void Card::del(Card &card, bool refresh, bool explic)
 	cards_.erase(std::find(cards_.begin(), cards_.end(), card));
 }
 
-Card::Card(int id, Deck *deck, std::unordered_map<std::string, std::string> fieldlist, int offset, int delay, Status status, int statinfo) : id_{id}, deck_{deck}, offset_{offset}, delay_{delay}, status_{status}, fields_{fieldlist}
+Card::Card(int id, Deck *deck, std::unordered_map<std::string, std::string> fieldlist, int step, int delay, Status status, int statinfo) : id_{id}, deck_{deck}, step_{step}, delay_{delay}, status_{status}, fields_{fieldlist}
 {
 //	for (int i = 0; i < fieldnames.size(); i++)
 //	{
@@ -156,10 +159,10 @@ void Card::edit(Deck &deck, int offset, int delay, Status status)
 		deck.addcard(*this);
 		deck_ = &deck;	
 	}
-	offset_ = offset;
+	step_ = Deck::curstep + offset;
 	delay_ = delay;
 	status_ = status;
-	deck_->s_refresh();
+	deck_->build();
 	backend::card_update(*this);
 }
 
@@ -170,7 +173,7 @@ std::vector<std::string> Card::vectorize(const std::vector<coldesc> &colspec) co
 	{
 		if (col.title == "Deck") ret.push_back(deck_->canonical());
 		else if (col.title == "Status") ret.push_back(stat2str(status_));
-		else if (col.title == "Offset") ret.push_back(util::t2s(offset_));
+		else if (col.title == "Offset") ret.push_back(util::t2s(offset()));
 		else if (col.title == "Interval") ret.push_back(util::t2s<int>(delay_));
 		else if (std::find(std::begin(fieldnames_), std::end(fieldnames_), col.title) != fieldnames_.end()) ret.push_back(fields_.at(col.title));
 		else ret.push_back("NULL");
@@ -219,7 +222,7 @@ bool Card::avail() const
 bool Card::due(int diff) const
 {
 	if (! avail()) return false;
-	if (offset_ <= diff) return true;
+	if (offset() <= diff) return true;
 	return false;
 }
 
@@ -234,7 +237,7 @@ bool Card::match(std::string query) const
 void Card::shift(int diff)
 {
 	if (status_ == Status::SUSP) return;
-	offset_ += diff;
+	step_ += diff;
 	backend::card_update(*this);
 }
 
@@ -247,22 +250,22 @@ void Card::update(UpdateType type)
 		case UpdateType::BURY:
 			break;
 		case UpdateType::NORM:
-			offset_ = delay_;
+			step_ = Deck::curstep + delay_;
 			break;
 		case UpdateType::INCR:
 			if (delay_ == 0) delay_ = 1;
-			else delay_ *= ratio;
-			offset_ = delay_;
+			else delay_ *= ratio_;
+			step_ = Deck::curstep + delay_;
 			if (delay_ > maxdelay_) status_ = Status::DONE;
 			break;
 		case UpdateType::DECR:
-			delay_ /= ratio;
-			offset_ = delay_;
+			delay_ /= ratio_;
+			step_ = Deck::curstep + delay_;
 			break;
 		case UpdateType::RESET:
 			status_ = Status::OK;
 			delay_ = 0;
-			offset_ = 0;
+			step_ = Deck::curstep;
 			break;
 		case UpdateType::DONE:
 			status_ = Status::DONE;
@@ -278,4 +281,9 @@ void Card::update(UpdateType type)
 			break;
 	}
 	backend::card_update(*this);
+}
+
+int Card::offset() const
+{
+	return step_ - Deck::curstep;
 }

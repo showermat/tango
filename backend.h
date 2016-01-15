@@ -28,6 +28,7 @@ class Deck;
 namespace backend
 {
 	extern sqlite3 *db;
+	static const int db_version = 1;
 	
 	void init(const std::vector<std::string> &args);
 	void db_setup(const std::string &fname);
@@ -42,7 +43,8 @@ namespace backend
 	void card_del(const Card &card);
 	void deck_edit(const Deck &deck, std::string oldname = "");
 	void deck_del(const Deck &deck);
-	void bank_edit(const Deck &deck, const std::string &character, bool active, int offset, int count, std::string olddeck = "");
+	void bank_edit(const Deck &deck, const std::string &character, bool active, int step, int count, std::string olddeck = "");
+	void set_step(int step);
 }
 
 #endif	/* LOGIC_H */
