@@ -32,7 +32,6 @@
 #define LICENSE "Apache License version 2.0"
 
 /* TODO
- * Soon:
  * Next:
  *	Make the disp_ field in Deck persistent and allow the user to edit it
  * Closing a window in front of Tango may cause it to quit as well?
@@ -52,7 +51,6 @@
  *	Add to card database fields for number of practices and number of correct/incorrect/resets/etc., and use this to calculate momentum or "score"
  * Add a preferences window allowing users to edit
  *	The maximum interval before a card is automatically marked done
- *	Option to keep track of the last date things were practiced and automatically advance the cards each time the program is opened
  *	Default settings for root deck
  * Keep track of the total number of steps taken and the number of steps since a given card was suspended
  * Filter card table by deck
@@ -265,7 +263,6 @@ void MainFrame::except(const std::exception &e)
 {
 	wxMessageDialog message{this, _(std::string{"The program experienced a fatal exception and will now exit:\n\n"} + e.what()), _("Exception"), wxOK | wxICON_ERROR};
 	message.ShowModal();
-	// TODO Can we try saving decks here?
 	wxExit();
 }
 
@@ -338,6 +335,10 @@ MainFrame::MainFrame(const wxString& title, const wxPoint& pos, const wxSize& si
 	card_columns.push_back(coldesc{coldesc::Type::CHOICE, "Status:Active,Suspended,Done,Leech", 80});
 	card_columns.push_back(coldesc{coldesc::Type::INT, "Offset", 80});
 	card_columns.push_back(coldesc{coldesc::Type::INT, "Interval:0," + util::t2s<int>(Card::maxdelay() * 2), 80});
+	card_columns.push_back(coldesc{coldesc::Type::STATIC_INT, "Norm", 80});
+	card_columns.push_back(coldesc{coldesc::Type::STATIC_INT, "Incr", 80});
+	card_columns.push_back(coldesc{coldesc::Type::STATIC_INT, "Decr", 80});
+	card_columns.push_back(coldesc{coldesc::Type::STATIC_INT, "Reset", 80});
 	populate_table_cols(browse_cards, card_columns);
 	sizer_cards->Add(browse_cards, 1, wxALIGN_CENTER | wxEXPAND | wxALL, 10);
 	wxSizer *sizer_card_buttons = new wxBoxSizer{wxHORIZONTAL};
@@ -357,8 +358,8 @@ MainFrame::MainFrame(const wxString& title, const wxPoint& pos, const wxSize& si
 	wxSizer *sizer_decks = new wxBoxSizer{wxVERTICAL};
 	browse_decks = new wxDataViewListCtrl{panel_decks, id_browse_decks};
 	deck_columns.push_back(coldesc{coldesc::Type::STRING, "Name", 160});
-	deck_columns.push_back(coldesc{coldesc::Type::STATIC_INT, "Cards", 40});
-	deck_columns.push_back(coldesc{coldesc::Type::STATIC_INT, "Due", 40});
+	deck_columns.push_back(coldesc{coldesc::Type::STATIC_INT, "Cards", 60});
+	deck_columns.push_back(coldesc{coldesc::Type::STATIC_INT, "Due", 60});
 	deck_columns.push_back(coldesc{coldesc::Type::BOOL, "Explicit", 40});
 	//deck_columns.push_back(coldesc{coldesc::Type::CHOICE, "Front:Kanji,Hiragana,Furigana,Meaning,All"});
 	//deck_columns.push_back(coldesc{coldesc::Type::CHOICE, "Back:Kanji,Hiragana,Furigana,Meaning,All"});

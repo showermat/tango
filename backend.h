@@ -1,12 +1,12 @@
 /* 
- * File:   logic.h
+ * File:   backend.h
  * Author: matt
  *
  * Created on July 28, 2013, 4:17 PM
  */
 
 #ifndef LOGIC_H
-#define	LOGIC_H
+#define LOGIC_H
 
 #include <vector>
 #include <list>
@@ -17,6 +17,7 @@
 #include <exception>
 #include <stdexcept>
 #include <algorithm>
+#include <ctime>
 #include <iostream> // TODO Remove after debugging
 #include <stdlib.h>
 #include <sqlite3.h>
@@ -28,7 +29,8 @@ class Deck;
 namespace backend
 {
 	extern sqlite3 *db;
-	static const int db_version = 1;
+	static const int db_version = 2;
+	std::time_t midnight();
 	
 	void init(const std::vector<std::string> &args);
 	void db_setup(const std::string &fname);
@@ -44,7 +46,7 @@ namespace backend
 	void deck_edit(const Deck &deck, std::string oldname = "");
 	void deck_del(const Deck &deck);
 	void bank_edit(const Deck &deck, const std::string &character, bool active, int step, int count, std::string olddeck = "");
-	void set_step(int step);
+	void step(int offset);
 }
 
 #endif	/* LOGIC_H */

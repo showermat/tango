@@ -53,14 +53,14 @@ Bank::Section &Bank::sect(std::string name)
 	return basis_.back();
 }
 
-bool Bank::check(Card *card) // True if the card should go in kanji, preventing multiple cards with the same kanji from being placed in the same set
+bool Bank::check(Card *card) // True if the card should go in kanji, preventing multiple cards with the same kanji from being placed in the same set // <-- This doesn't work because duplicate kanji are detected at the leaf decks, and higher-level decks are the sum of the child decks.  Disabled.
 {
 	if (! words().size()) return false;
-	bool ret = false;
-	for (const std::string &word : tokenize(card->field(field_))) if (words().count(word)) ret = true;
-	if (! ret) return false;
-	for (const std::string &word : tokenize(card->field(field_))) if (! words().count(word) || inset_.count(word) || words().at(word).offset() > 0) return false;
-	for (const std::string &word : tokenize(card->field(field_))) inset_.insert(word);
+	const std::vector<std::string> cardwords = tokenize(card->field(field_));
+	if (! cardwords.size()) return false;
+	//for (const std::string &word : cardwords) if (! words().count(word) || inset_.count(word) || words().at(word).offset() > 0) return false;
+	for (const std::string &word : cardwords) if (! words().count(word) || words().at(word).offset() > 0) return false;
+	for (const std::string &word : cardwords) inset_.insert(word);
 	return true;
 }
 

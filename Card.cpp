@@ -106,12 +106,12 @@ std::string Card::hiragana(std::string kanji, std::string furigana)
 	return ret.str();
 }
 
-Card &Card::add(Deck &deck, int id, std::unordered_map<std::string, std::string> fieldlist, int offset, int delay, Card::Status status, int statinfo, bool fromdb)
+Card &Card::add(Deck &deck, int id, std::unordered_map<std::string, std::string> fieldlist, int offset, int delay, std::unordered_map<UpdateType, int, uthash> count, Card::Status status, int statinfo, bool fromdb)
 {
 	int step;
 	if (fromdb) step = offset;
 	else step = offset + Deck::curstep;
-	cards_.emplace_back(Card{id, &deck, fieldlist, step, delay, status, statinfo});
+	cards_.emplace_back(Card{id, &deck, fieldlist, step, delay, count, status, statinfo});
 	cardnum_ = std::max(id, cardnum_);
 	Card &c = cards_.back();
 	deck.addcard(c, ! fromdb);
@@ -122,7 +122,7 @@ Card &Card::add(Deck &deck, int id, std::unordered_map<std::string, std::string>
 
 Card &Card::create(Deck &deck)
 {
-	return add(deck, ++cardnum_, std::unordered_map<std::string, std::string>{}, 0, 0, Card::Status::OK, 0);
+	return add(deck, ++cardnum_, {}, 0, 0, {}, Card::Status::OK, 0);
 }
 
 void Card::del(Card &card, bool refresh, bool explic)
@@ -137,15 +137,6 @@ void Card::del(Card &card, bool refresh, bool explic)
 	}
 	if (backend::db && refresh) backend::card_del(card);
 	cards_.erase(std::find(cards_.begin(), cards_.end(), card));
-}
-
-Card::Card(int id, Deck *deck, std::unordered_map<std::string, std::string> fieldlist, int step, int delay, Status status, int statinfo) : id_{id}, deck_{deck}, step_{step}, delay_{delay}, status_{status}, fields_{fieldlist}
-{
-//	for (int i = 0; i < fieldnames.size(); i++)
-//	{
-//		std::string curfield = util::strto(fieldlist, ":");
-//		fields_[fieldnames[i]] = curfield;
-//	}
 }
 
 void Card::edit(Deck &deck, int offset, int delay, Status status)
@@ -175,6 +166,10 @@ std::vector<std::string> Card::vectorize(const std::vector<coldesc> &colspec) co
 		else if (col.title == "Status") ret.push_back(stat2str(status_));
 		else if (col.title == "Offset") ret.push_back(util::t2s(offset()));
 		else if (col.title == "Interval") ret.push_back(util::t2s<int>(delay_));
+		else if (col.title == "Norm") ret.push_back(util::t2s<int>(count_.at(UpdateType::NORM)));
+		else if (col.title == "Incr") ret.push_back(util::t2s<int>(count_.at(UpdateType::INCR)));
+		else if (col.title == "Decr") ret.push_back(util::t2s<int>(count_.at(UpdateType::DECR)));
+		else if (col.title == "Reset") ret.push_back(util::t2s<int>(count_.at(UpdateType::RESET)));
 		else if (std::find(std::begin(fieldnames_), std::end(fieldnames_), col.title) != fieldnames_.end()) ret.push_back(fields_.at(col.title));
 		else ret.push_back("NULL");
 	}
@@ -280,6 +275,7 @@ void Card::update(UpdateType type)
 			status_ = Status::OK;
 			break;
 	}
+	count_[type]++;
 	backend::card_update(*this);
 }
 

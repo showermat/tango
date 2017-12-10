@@ -75,4 +75,3 @@ public:
 namespace std { template <> struct hash<Set::SetType> { size_t operator ()(const Set::SetType &x) const { return static_cast<size_t>(x); } }; }
 
 #endif	/* SET_H */
-

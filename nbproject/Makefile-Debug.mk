@@ -69,45 +69,45 @@ ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/tango: ${OBJECTFILES}
 	${MKDIR} -p ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}
 	${LINK.cc} -o ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/tango ${OBJECTFILES} ${LDLIBSOPTIONS} `wx-config --version=3.0 --libs` -lsqlite3
 
-${OBJECTDIR}/Bank.o: Bank.cpp 
+${OBJECTDIR}/Bank.o: Bank.cpp
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -s -DDEBUG -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/Bank.o Bank.cpp
+	$(COMPILE.cc) -g -s -DDEBUG -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/Bank.o Bank.cpp
 
-${OBJECTDIR}/Card.o: Card.cpp 
+${OBJECTDIR}/Card.o: Card.cpp
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -s -DDEBUG -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/Card.o Card.cpp
+	$(COMPILE.cc) -g -s -DDEBUG -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/Card.o Card.cpp
 
-${OBJECTDIR}/Deck.o: Deck.cpp 
+${OBJECTDIR}/Deck.o: Deck.cpp
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -s -DDEBUG -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/Deck.o Deck.cpp
+	$(COMPILE.cc) -g -s -DDEBUG -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/Deck.o Deck.cpp
 
-${OBJECTDIR}/Set.o: Set.cpp 
+${OBJECTDIR}/Set.o: Set.cpp
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -s -DDEBUG -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/Set.o Set.cpp
+	$(COMPILE.cc) -g -s -DDEBUG -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/Set.o Set.cpp
 
-${OBJECTDIR}/backend.o: backend.cpp 
+${OBJECTDIR}/backend.o: backend.cpp
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -s -DDEBUG -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/backend.o backend.cpp
+	$(COMPILE.cc) -g -s -DDEBUG -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/backend.o backend.cpp
 
-${OBJECTDIR}/coldesc.o: coldesc.cpp 
+${OBJECTDIR}/coldesc.o: coldesc.cpp
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -s -DDEBUG -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/coldesc.o coldesc.cpp
+	$(COMPILE.cc) -g -s -DDEBUG -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/coldesc.o coldesc.cpp
 
-${OBJECTDIR}/gui.o: gui.cpp 
+${OBJECTDIR}/gui.o: gui.cpp
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -s -DDEBUG -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/gui.o gui.cpp
+	$(COMPILE.cc) -g -s -DDEBUG -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/gui.o gui.cpp
 
-${OBJECTDIR}/util.o: util.cpp 
+${OBJECTDIR}/util.o: util.cpp
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -s -DDEBUG -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/util.o util.cpp
+	$(COMPILE.cc) -g -s -DDEBUG -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/util.o util.cpp
 
 # Subprojects
 .build-subprojects:
@@ -115,7 +115,6 @@ ${OBJECTDIR}/util.o: util.cpp
 # Clean Targets
 .clean-conf: ${CLEAN_SUBPROJECTS}
 	${RM} -r ${CND_BUILDDIR}/${CND_CONF}
-	${RM} ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/tango
 
 # Subprojects
 .clean-subprojects:

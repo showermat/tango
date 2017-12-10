@@ -1,5 +1,5 @@
 /* 
- * File:   logic.cpp
+ * File:   backend.cpp
  * Author: Matthew Schauer
  *
  * Created on July 27, 2013, 5:46 PM
@@ -14,6 +14,14 @@ namespace backend
 {
 	std::string deckfname{};
 	sqlite3 *db = nullptr;
+	
+	std::time_t midnight()
+	{
+		std::time_t now = std::time(nullptr);
+		std::tm *ret = std::localtime(&now);
+		ret->tm_sec = ret->tm_min = ret->tm_hour = 0;
+		return std::mktime(ret);
+	}
 	
 	void cleanup()
 	{
@@ -89,8 +97,9 @@ namespace backend
 	void db_setup(const std::string &fname)
 	{
 		std::vector<std::string> schema{
-			"CREATE TABLE \"info\" (`version` INTEGER, `step` INTEGER)",
-			"CREATE TABLE \"card\" ( `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, `deck` TEXT NOT NULL, `step` INTEGER, `interval` INTEGER NOT NULL DEFAULT 0, `status` INTEGER )",
+			"CREATE TABLE \"info\" (`version` INTEGER, `step` INTEGER, `laststep` INTEGER)",
+			"CREATE TABLE \"prefs\" (`autostep` INTEGER)",
+			"CREATE TABLE \"card\" ( `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, `deck` TEXT NOT NULL, `step` INTEGER NOT NULL DEFAULT 1, `interval` INTEGER NOT NULL DEFAULT 0, `status` INTEGER, `upd_norm` INTEGER NOT NULL DEFAULT 0, `upd_decr` INTEGER NOT NULL DEFAULT 0, `upd_incr` INTEGER NOT NULL DEFAULT 0, `upd_reset` INTEGER NOT NULL DEFAULT 0 )",
 			"CREATE TABLE \"character\" ( `deck` TEXT NOT NULL, `category` TEXT, `character` TEXT NOT NULL, `active` INTEGER NOT NULL, `step` INTEGER, `count` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(deck,character), FOREIGN KEY(`deck`) REFERENCES deck ( id ), FOREIGN KEY(`category`) REFERENCES kanji_category ( name ) )",
 			"CREATE TABLE \"character_category\" ( `deck` TEXT NOT NULL, `name` TEXT NOT NULL, PRIMARY KEY(deck,name) )",
 			"CREATE TABLE \"deck\" ( `name` TEXT NOT NULL, PRIMARY KEY(name) )",
@@ -125,6 +134,16 @@ namespace backend
 			checksql(sqlite3_step(stmt), "Failed to set up fields in database");
 			sqlite3_finalize(stmt);
 		}
+		checksql(sqlite3_prepare_v2(db, "insert into `info` (`version`, `step`, `laststep`) values (?, ?, ?)", -1, &stmt, nullptr), "Failed to set up database info");
+		checksql(sqlite3_bind_int(stmt, 1, db_version));
+		checksql(sqlite3_bind_int(stmt, 2, 0));
+		checksql(sqlite3_bind_int(stmt, 3, midnight()));
+		checksql(sqlite3_step(stmt), "Failed to set up database info");
+		sqlite3_finalize(stmt);
+		checksql(sqlite3_prepare_v2(db, "insert into `prefs` (`autostep`) values (?)", -1, &stmt, nullptr), "Failed to set up database preferences");
+		checksql(sqlite3_bind_int(stmt, 1, 0));
+		checksql(sqlite3_step(stmt), "Failed to set up database preferences");
+		sqlite3_finalize(stmt);
 		transac_end();
 		sqlite3_close(db);
 		db = nullptr;
@@ -140,7 +159,7 @@ namespace backend
 		while (sqlite3_step(stmt) == SQLITE_ROW) Deck::add(std::string{(const char *) sqlite3_column_text(stmt, 0)});
 		sqlite3_finalize(stmt);
 		
-		checksql(sqlite3_prepare_v2(db, "select `id`, `deck`, `step`, `interval`, `status` from `card`", -1, &stmt, nullptr), "Failed to fetch cards");
+		checksql(sqlite3_prepare_v2(db, "select `id`, `deck`, `step`, `interval`, `status`, `upd_norm`, `upd_decr`, `upd_incr`, `upd_reset` from `card`", -1, &stmt, nullptr), "Failed to fetch cards");
 		while (sqlite3_step(stmt) == SQLITE_ROW)
 		{
 			int id{sqlite3_column_int(stmt, 0)};
@@ -148,6 +167,7 @@ namespace backend
 			int step{sqlite3_column_int(stmt, 2)};
 			int interval{sqlite3_column_int(stmt, 3)};
 			Card::Status status{(Card::Status) sqlite3_column_int(stmt, 4)};
+			std::unordered_map<Card::UpdateType, int, Card::uthash> count{{Card::UpdateType::NORM, sqlite3_column_int(stmt, 5)}, {Card::UpdateType::DECR, sqlite3_column_int(stmt, 6)}, {Card::UpdateType::INCR, sqlite3_column_int(stmt, 7)}, {Card::UpdateType::RESET, sqlite3_column_int(stmt, 8)}};
 			std::unordered_map<std::string, std::string> fields{};
 			sqlite3_stmt *stmt2;
 			checksql(sqlite3_prepare_v2(db, "select `field`, `value` from `field` where `card` = ?", -1, &stmt2, nullptr), "Failed to fetch fields");
@@ -159,7 +179,7 @@ namespace backend
 				fields[field] = value;
 			}
 			sqlite3_finalize(stmt2);
-			Card::add(Deck::get(deckname), id, fields, step, interval, status, 0, true);
+			Card::add(Deck::get(deckname), id, fields, step, interval, count, status, 0, true);
 		}
 		sqlite3_finalize(stmt);
 		
@@ -195,12 +215,26 @@ namespace backend
 		sqlite3_stmt *stmt;
 		if (db == nullptr) throw std::runtime_error{"Database connection unexpectedly closed"};
 		
-		checksql(sqlite3_prepare_v2(db, "select `version`, `step` from `info`", -1, &stmt, nullptr), "Failed to verify database version");
+		checksql(sqlite3_prepare_v2(db, "select `version`, `step`, `laststep` from `info`", -1, &stmt, nullptr), "Failed to verify database version");
 		if (sqlite3_step(stmt) != SQLITE_ROW) throw std::runtime_error{"Failed to verify database version"};
 		int ver = sqlite3_column_int(stmt, 0);
 		if (ver != db_version) throw std::runtime_error{"Program requires database of version " + util::t2s(db_version) + ", but current database is version " + util::t2s(ver)};
 		Deck::curstep = sqlite3_column_int(stmt, 1);
+		std::time_t laststep = sqlite3_column_int(stmt, 2);
 		sqlite3_finalize(stmt);
+		
+		checksql(sqlite3_prepare_v2(db, "select `autostep` from `prefs`", -1, &stmt, nullptr), "Failed to retrieve preferences");
+		if (sqlite3_step(stmt) != SQLITE_ROW) throw std::runtime_error{"Failed to retrieve preferences"};
+		bool auto_step = sqlite3_column_int(stmt, 0);
+		sqlite3_finalize(stmt);
+		
+		int diff = (midnight() - laststep) / (24 * 3600); // No leap seconds
+		if (auto_step && diff > 0)
+		{
+			std::cout << "Advancing decks by " << diff << " steps\n";
+			Deck::curstep += diff;
+			step(diff);
+		}
 		
 		checksql(sqlite3_prepare_v2(db, "select `name` from `fieldname`", -1, &stmt, nullptr), "Failed to fetch field names");
 		while (sqlite3_step(stmt) == SQLITE_ROW)
@@ -239,15 +273,19 @@ namespace backend
 		if (sqlite3_step(stmt) != SQLITE_ROW) newcard = true;
 		sqlite3_finalize(stmt);
 		
-		if (newcard) checksql(sqlite3_prepare_v2(db, "insert into `card` (`deck`, `step`, `interval`, `status`, `id`) values (?, ?, ?, ?, ?)", -1, &stmt, nullptr));
-		else checksql(sqlite3_prepare_v2(db, "update `card` set `deck` = ?, `step` = ?, `interval` = ?, `status` = ? where `id` = ?", -1, &stmt, nullptr));
+		if (newcard) checksql(sqlite3_prepare_v2(db, "insert into `card` (`deck`, `step`, `interval`, `status`, `upd_norm`, `upd_decr`, `upd_incr`, `upd_reset`, `id`) values (?, ?, ?, ?, ?, ?, ?, ?, ?)", -1, &stmt, nullptr));
+		else checksql(sqlite3_prepare_v2(db, "update `card` set `deck` = ?, `step` = ?, `interval` = ?, `status` = ?, `upd_norm` = ?, `upd_decr` = ?, `upd_incr` = ?, `upd_reset` = ? where `id` = ?", -1, &stmt, nullptr));
 		
 		std::string name = card.deck()->canonical();
 		checksql(sqlite3_bind_text(stmt, 1, name.c_str(), -1, nullptr));
 		checksql(sqlite3_bind_int(stmt, 2, card.step()));
 		checksql(sqlite3_bind_int(stmt, 3, card.delay()));
 		checksql(sqlite3_bind_int(stmt, 4, (int) card.status()));
-		checksql(sqlite3_bind_int(stmt, 5, card.id()));
+		checksql(sqlite3_bind_int(stmt, 5, card.count()[Card::UpdateType::NORM]));
+		checksql(sqlite3_bind_int(stmt, 6, card.count()[Card::UpdateType::DECR]));
+		checksql(sqlite3_bind_int(stmt, 7, card.count()[Card::UpdateType::INCR]));
+		checksql(sqlite3_bind_int(stmt, 8, card.count()[Card::UpdateType::RESET]));
+		checksql(sqlite3_bind_int(stmt, 9, card.id()));
 		checksql(sqlite3_step(stmt));
 		sqlite3_finalize(stmt);
 	}
@@ -360,13 +398,14 @@ namespace backend
 		sqlite3_finalize(stmt);
 	}
 	
-	void set_step(int step)
+	void step(int offset)
 	{
 		sqlite3_stmt *stmt;
 		if (db == nullptr) throw std::runtime_error{"Database connection unexpectedly closed"};
 		
-		checksql(sqlite3_prepare_v2(db, "update `info` set `step` = ?", -1, &stmt, nullptr));
-		checksql(sqlite3_bind_int(stmt, 1, step));
+		checksql(sqlite3_prepare_v2(db, "update `info` set `step` = `step` + ?, `laststep` = ?", -1, &stmt, nullptr));
+		checksql(sqlite3_bind_int(stmt, 1, offset));
+		checksql(sqlite3_bind_int(stmt, 2, midnight()));
 		checksql(sqlite3_step(stmt));
 		sqlite3_finalize(stmt);
 	}

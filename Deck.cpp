@@ -15,8 +15,9 @@ std::default_random_engine Deck::rand_{(long unsigned int) std::chrono::system_c
 
 void Deck::step(int offset)
 {
+	if (offset == 0) return;
 	curstep += offset;
-	backend::set_step(curstep);
+	backend::step(offset);
 	for (Deck &d : decks_) d.build();
 }
 
