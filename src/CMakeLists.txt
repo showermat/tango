@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.3)
-project(tangox)
+project(tango)
 set(VERSION 0.4)
 execute_process(COMMAND wx-config ARGS --version=3.0 --cxxflags OUTPUT_VARIABLE wxcxxflags OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process(COMMAND wx-config ARGS --version=3.0 --libs OUTPUT_VARIABLE wxldflags OUTPUT_STRIP_TRAILING_WHITESPACE)

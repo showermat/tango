@@ -13,9 +13,8 @@ hardcoded into the program or done manually by me.  Expect this to change as the
 Usage
 -----
 
-Compilation should be relatively simple.  Just run `make` in the root directory, and the executable should be placed in the `build`
-subdirectory.  I'm using a NetBeans-generated Makefile, and I'm not sure about how that works internally, so if you try to compile
-it and it doesn't work, let me know because I'll never figure it out myself.
+To build, just `cd` into the cloned source directory and run `cmake src && make`.  You will need the wxWidgets libraries (`wx-config
+--version` should return 3 or greater) and SQLite 3 installed.
 
 Tango uses a SQLite3 database at the user's `XDG_CONFIG_HOME/tango/decks.db` for storing configuration and practice data.  If this
 file does not exist, it is created at startup, which should allow a user to start using Tango immediately, except for the "bank"
