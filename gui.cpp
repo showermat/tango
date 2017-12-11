@@ -58,6 +58,11 @@
  * Single out and present problem children
  */
 
+std::string wx2utf8(const wxString &str)
+{
+	return std::string{str.utf8_str().data()};
+}
+
 /******************************************************************************
  * GUI structure
  ******************************************************************************/
@@ -181,15 +186,16 @@ TAG_HANDLER_PROC(tag)
 {
 	MainFrame *frame = (MainFrame *) m_WParser->GetWindowInterface()->GetHTMLWindow()->GetParent()->GetParent()->GetParent(); // Is there seriously no easier way to get the frame in this context?	
 	wxString word = tag.GetParam(_("name"));
-	bool enabled = frame->curset->deck().bank().enabled(word.ToStdString());
+	std::string wordstr = wx2utf8(word);
+	bool enabled = frame->curset->deck().bank().enabled(wordstr);
 	wxButton *button = new wxButton{m_WParser->GetWindowInterface()->GetHTMLWindow(), wxID_ANY, word, wxDefaultPosition, wxSize{46, 46}, wxBORDER_NONE};
 	button->SetFont(wxFont{24, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL});
 	button->SetForegroundColour(enabled ? wxColour{_("black")} : wxColour{_("gray")});
 	button->Bind(wxEVT_BUTTON, [=](wxCommandEvent &event)
 	{
-		bool en = ! frame->curset->deck().bank().enabled(word.ToStdString());
+		bool en = ! frame->curset->deck().bank().enabled(wordstr);
 		button->SetForegroundColour(en ? wxColour{"black"} : wxColour{"gray"});
-		frame->setbankitem(word.ToStdString(), en);
+		frame->setbankitem(wordstr, en);
 	});
 	button->Show(true);
 	m_WParser->GetContainer()->InsertCell(new wxHtmlWidgetCell(button, 0));
@@ -228,7 +234,7 @@ IMPLEMENT_APP(App)
 bool App::OnInit() try
 {
 	std::vector<std::string> args;
-	for (int i = 0; i < argc; i++) args.push_back(wxString{argv[i]}.ToStdString());
+	for (int i = 0; i < argc; i++) args.push_back(wx2utf8(wxString{argv[i]}));
 	backend::init(args);
 	backend::early_populate(); // Load fieldnames
 	frame = new MainFrame{_("Tango"), wxPoint(200, 200), wxSize(600, 400)};
@@ -439,11 +445,12 @@ wxVector<wxVariant> MainFrame::cols2wxvec(std::vector<coldesc> colspec, std::vec
 	{
 		wxVariant variant{};
 		coldesc::Type type = colspec[i].type;
-		if (type == coldesc::Type::STRING || type == coldesc::Type::FIELD || type == coldesc::Type::STATIC_INT) variant = wxVariant{_(cols[i])};
+		if (type == coldesc::Type::STRING || type == coldesc::Type::FIELD || type == coldesc::Type::STATIC_INT) variant = wxVariant{wxString::FromUTF8(cols[i].c_str())};
 		//else if (type == coldesc::Type::DATE) variant = wxVariant{wxDateTime{date{cols[i]}.mktime()}};
-		else if (type == coldesc::Type::CHOICE) variant = wxVariant{_(cols[i])};
+		else if (type == coldesc::Type::CHOICE) variant = wxVariant{wxString::FromUTF8(cols[i].c_str())};
 		else if (type == coldesc::Type::INT) variant = wxVariant{util::s2t<int>(cols[i])};
 		else if (type == coldesc::Type::BOOL) variant = wxVariant{cols[i] == "true" ? true : false};
+		else throw std::runtime_error{"Unknown column description type"};
 		row.push_back(variant);
 	}
 	return row;
@@ -533,10 +540,12 @@ void MainFrame::delcard(int row)
 
 void MainFrame::showcard()
 {
-	if (! curset) study_view->SetPage(_(html_pref + "(No deck selected)" + html_suff));
-	else if (curset->size() == 0) study_view->SetPage(_(html_pref + "(No cards in current set)" + html_suff));
-	//else study_view->SetPage(_(html_pref + curset->top().display(cardback ? curset->deck().type_back() : curset->type_front()) + html_suff));
-	else study_view->SetPage(_(html_pref + curset->disptop(disp) + html_suff));
+	std::string body{};
+	if (! curset) body = "(No deck selected)";
+	else if (curset->size() == 0) body = "(No cards in current set)";
+	//else body = curset->top().display(cardback ? curset->deck().type_back() : curset->type_front());
+	else body = curset->disptop(disp) + html_suff;
+	study_view->SetPage(wxString::FromUTF8((html_pref + body + html_suff).c_str()));
 	stattext();
 }
 
@@ -590,10 +599,11 @@ void MainFrame::debug_tablecheck()
 	{
 		wxVariant var{};
 		browse_cards->GetValue(var, browse_cards->ItemToRow(pair.first), 1);
-		//std::cerr << var.GetString().ToStdString() << "\t" << pair.second->field("Expression") << "\n";
-		if (var.GetString().ToStdString() != pair.second->field("Expression"))
+		std::string expr = wx2utf8(var.GetString());
+		//std::cerr << expr << " - " << pair.second->field("Expression") << "\n";
+		if (expr != pair.second->field("Expression"))
 		{
-			std::cerr << "Card mapping mismatch:  " << var.GetString().ToStdString() << " vs " << pair.second->field("Expression") << "\n";
+			std::cerr << "Card mapping mismatch:  " << expr << " vs " << pair.second->field("Expression") << "\n";
 			throw std::runtime_error{"Card table continuity error"};
 		}
 	}
@@ -601,10 +611,11 @@ void MainFrame::debug_tablecheck()
 	{
 		wxVariant var{};
 		browse_decks->GetValue(var, browse_decks->ItemToRow(pair.first), 0);
-		//std::cerr << var.GetString().ToStdString() << "\t" << pair.second->canonical() << "\n";
-		if (var.GetString().ToStdString() != pair.second->canonical())
+		std::string name = wx2utf8(var.GetString());
+		//std::cerr << name << " - " << pair.second->canonical() << "\n";
+		if (name != pair.second->canonical())
 		{
-			std::cerr << "Deck mapping mismatch:  " << var.GetString().ToStdString() << " vs " << pair.second->canonical() << "\n";
+			std::cerr << "Deck mapping mismatch:  " << name << " vs " << pair.second->canonical() << "\n";
 			throw std::runtime_error{"Deck table continuity error"};
 		}
 	}
@@ -649,8 +660,8 @@ void MainFrame::populate_decktable()
 
 void MainFrame::populate_bankview()
 {
-	if (curset) bank_view->SetPage(_(curset->deck().bank().htmlview()));
-	else bank_view->SetPage(_("<html><body><center>(No deck selected)</center></body></html>"));
+	if (curset) bank_view->SetPage(wxString::FromUTF8(curset->deck().bank().htmlview().c_str()));
+	else bank_view->SetPage("<html><body><center>(No deck selected)</center></body></html>");
 }
 
 void MainFrame::refresh_views(int mode) try
@@ -791,7 +802,7 @@ catch(std::exception &e) { except(e); }
 
 void MainFrame::card_searched(wxCommandEvent &event) try
 {
-	populate_cardtable(event.GetString().ToStdString());
+	populate_cardtable(wx2utf8(event.GetString()));
 }
 catch(std::exception &e) { except(e); }
 
@@ -810,12 +821,13 @@ void MainFrame::card_edited(wxDataViewEvent &event) try
 	{
 		wxVariant variant{};
 		browse_cards->GetValue(variant, row, col);
+		std::string value = wx2utf8(variant.GetString());
 		std::string field = card_columns[col].title;
-		if (field == "Deck") deck = &Deck::get(variant.GetString().ToStdString());
-		else if (field == "Status") status = Card::str2stat(variant.GetString().ToStdString());
+		if (field == "Deck") deck = &Deck::get(value);
+		else if (field == "Status") status = Card::str2stat(value);
 		else if (field == "Offset") offset = variant.GetInteger(); //nextdue = date{variant.GetDateTime().GetTicks()};
 		else if (field == "Interval") delay = variant.GetInteger();
-		else if (card_columns[col].type == coldesc::Type::FIELD) row2card(row)->field(field, variant.GetString().ToStdString());
+		else if (card_columns[col].type == coldesc::Type::FIELD) row2card(row)->field(field, value);
 	}
 	row2card(row)->edit(*deck, offset, delay, status);
 	if (curset && ! Deck::exists(curdeck)) curset = nullptr;
@@ -870,7 +882,7 @@ void MainFrame::setbankitem(const std::string word, bool enabled)
 
 void MainFrame::bankitem_set(wxHtmlLinkEvent &event) try
 {
-	std::string word = event.GetLinkInfo().GetHref().ToStdString();
+	std::string word = wx2utf8(event.GetLinkInfo().GetHref());
 	setbankitem(word, ! curset->deck().bank().enabled(word));
 }
 catch(std::exception &e) { except(e); }
@@ -887,11 +899,12 @@ void MainFrame::deck_edited(wxDataViewEvent &event) try
 	{
 		wxVariant variant{};
 		browse_decks->GetValue(variant, deck2row(deck), col);
+		std::string value = wx2utf8(variant.GetString());
 		std::string field = deck_columns[col].title;
-		if (field == "Name") name = variant.GetString().ToStdString();
+		if (field == "Name") name = value;
 		else if (field == "Explicit") explic = variant.GetBool();
-		else if (field == "Front") front = Card::str2sit(variant.GetString().ToStdString());
-		else if (field == "Back") back = Card::str2sit(variant.GetString().ToStdString());
+		else if (field == "Front") front = Card::str2sit(value);
+		else if (field == "Back") back = Card::str2sit(value);
 	}
 	if (! deck->edit(name, explic)) throw std::runtime_error{"Deck editing failed"}; // TODO This should not be a fatal error; just pop something up
 	// TODO Get selected row
